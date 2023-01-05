@@ -1,0 +1,5 @@
+$govuk-assets-path: '/static/assets/';
+$govuk-images-path: '/static/assets/images/';
+
+@import "node_modules/govuk-frontend/govuk/all";
+@import "node_modules/@ministryofjustice/frontend/moj/all";

@@ -1,0 +1,42 @@
+{% extends "govuk_base.html" %}
+{% load unslackify %}
+
+{% block title %}
+    OPG Incident Response
+{% endblock %}
+
+{% block content %}
+    <h1 class="govuk-heading-xl">Incidents</h1>
+
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Incident</th>
+                <th scope="col" class="govuk-table__header">Status</th>
+                <th scope="col" class="govuk-table__header">Start time</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            {% for incident in incidents %}
+                <tr class="govuk-table__row">
+                    <th scope="row" class="govuk-table__header">
+                        <a class="govuk-link" href="/incident/{{ incident.id }}">
+                            {{ incident.report | unslackify }}
+                        </a>
+                    </th>
+                    <td class="govuk-table__header">
+                        {% if incident.status_text != "resolved" %}
+                            <strong class="govuk-tag govuk-tag--red">{{ incident.status_text|upper }} - {{ incident.severity_text }}</strong>
+                        {% else %}
+                            <strong class="govuk-tag govuk-tag--grey">Resolved - {{ incident.severity_text }}</strong>
+                        {% endif %}
+                    </td>
+                    <td class="govuk-table__cell">
+                        {{ incident.start_time | date:"j F Y, g:iA" }}
+                        ({{ incident.start_time | timesince }} ago)
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

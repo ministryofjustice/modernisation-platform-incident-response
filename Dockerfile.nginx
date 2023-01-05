@@ -1,0 +1,33 @@
+FROM node:19.0.1-alpine3.16 as asset-env
+
+WORKDIR /app
+
+COPY nginx/webpack .
+
+RUN yarn && yarn build
+
+FROM nginx:stable-alpine
+
+# Add Confd to configure nginx on start
+ENV CONFD_VERSION="0.16.0"
+RUN wget -q -O /usr/local/bin/confd "https://github.com/kelseyhightower/confd/releases/download/v${CONFD_VERSION}/confd-${CONFD_VERSION}-linux-amd64" \
+  && chmod +x /usr/local/bin/confd \
+  && apk add --no-cache curl
+
+# Add Waitforit to wait on app starting
+ENV WAITFORIT_VERSION="v2.4.1"
+RUN wget -q -O /usr/local/bin/waitforit https://github.com/maxcnunes/waitforit/releases/download/${WAITFORIT_VERSION}/waitforit-linux_amd64 \
+  && chmod +x /usr/local/bin/waitforit
+
+
+COPY nginx/etc /etc
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY opgincidentresponse/static /app/opgincidentresponse/static
+COPY --from=node /home/node /app/opgincidentresponse/static
+COPY --from=asset-env /app/dist /app/opgincidentresponse/static
+
+
+RUN mkdir -p /var/www/public
+CMD confd -onetime -backend env \
+  && waitforit -address=tcp://${APP_HOST}:${APP_PORT} -timeout=20 \
+  && nginx -g "daemon off;"

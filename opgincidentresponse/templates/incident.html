@@ -1,0 +1,173 @@
+{% extends "govuk_base.html" %}
+{% load opg_response %}
+{% load unslackify %}
+
+{% block title %}
+    {{ incident.report | unslackify }} — OPG Incident Response
+{% endblock %}
+
+{% block content %}
+    <h1 class="govuk-heading-xl">{{ incident.report | unslackify }}</h1>
+
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-two-thirds">
+            <dl class="govuk-summary-list">
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">
+                        Summary
+                    </dt>
+                    <dd class="govuk-summary-list__value">
+                        {% if incident.summary %}{{ incident.summary | slack_format | unslackify | safe }}{% else %}<em>None</em>{% endif %}
+                    </dd>
+                    <dd class="govuk-summary-list__actions"></dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">
+                        Impact
+                    </dt>
+                    <dd class="govuk-summary-list__value">
+                        {% if incident.impact %}{{ incident.impact | slack_format | unslackify | safe }}{% else %}<em>None</em>{% endif %}
+                    </dd>
+                    <dd class="govuk-summary-list__actions"></dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">
+                        Reporter
+                    </dt>
+                    <dd class="govuk-summary-list__value">
+                        {{ incident.reporter.full_name }}
+                    </dd>
+                    <dd class="govuk-summary-list__actions">
+                        <a class="govuk-link" href="{{ incident.reporter.external_id | slack_dm_link }}">
+                            Slack
+                        </a>
+                    </dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">
+                        Lead
+                    </dt>
+                    <dd class="govuk-summary-list__value">
+                        {% if incident.lead %}{{ incident.lead.full_name }}{% else %}<em>Not assigned</em>{% endif %}
+                    </dd>
+                    <dd class="govuk-summary-list__actions">
+                        {% if incident.lead %}
+                            <a class="govuk-link" href="{{ incident.lead.external_id | slack_dm_link }}">
+                                Slack
+                            </a>
+                        {% endif %}
+                    </dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">
+                        Start time
+                    </dt>
+                    <dd class="govuk-summary-list__value">
+                        {{ incident.start_time | date:"j F Y, g:iA" }}
+                        ({{ incident.start_time | timesince }} ago)
+                    </dd>
+                    <dd class="govuk-summary-list__actions"></dd>
+                </div>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">
+                        Report time
+                    </dt>
+                    <dd class="govuk-summary-list__value">
+                        {{ incident.report_time | date:"j F Y, g:iA" }}
+                        ({{ incident.start_time | timesince }} ago)
+                    </dd>
+                    <dd class="govuk-summary-list__actions"></dd>
+                </div>
+            </dl>
+
+            <div class="govuk-form-group">
+                <fieldset class="govuk-fieldset" data-module="app-actions" data-incident-id="{{ incident.id }}">
+                    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                        <h2 class="govuk-heading-l">Actions</h2>
+                    </legend>
+                    {% if actions %}
+                        <div class="govuk-checkboxes govuk-checkboxes--small">
+                            {% for action in actions %}
+                                <div class="govuk-checkboxes__item">
+                                    <input class="govuk-checkboxes__input" id="action-{{ action.id }}" name="action[{{action.id}}]" value="{{ action.id }}" type="checkbox" {% if action.done %}checked{% endif %}>
+                                    <label class="govuk-label govuk-checkboxes__label" for="action-{{ action.id }}" data-raw="{{ action.details | safe | escape_quote | safe }}">
+                                        {{ action.details | slack_format | unslackify | safe }}
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="govuk-body">No actions yet, you can create them in Slack</p>
+                    {% endif %}
+                </fieldset>
+            </div>
+
+            <h2 class="govuk-heading-l">Timeline</h2>
+            <div class="moj-timeline">
+                {% if events %}
+                {% for event in events %}
+                <div class="moj-timeline__item">
+                    <div class="moj-timeline__header">
+                        <h2 class="moj-timeline__title">Timeline Event</h2>
+
+                        <p class="moj-timeline__byline">by {{event.author.display_name}}</p>
+
+                    </div>
+
+                    <p class="moj-timeline__date">
+                    <time datetime="{{ event.timestamp | date:"c" }}">{{ event.timestamp | date:"j F Y, g:iA" }}</time>
+                    </p>
+
+                    <div class="moj-timeline__description">
+                        <p>{{ event.text | unslackify | slack_format | safe }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="moj-timeline__item">
+                    <div class="moj-timeline__header">
+                        <h2 class="moj-timeline__title">No events yet, pin a message in Slack to add one</h2>
+                        <p class="moj-timeline__byline">by OPG Response Bot</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="govuk-grid-column-one-third">
+            {% if incident.status_text == "resolved" %}
+                <p class="govuk-body">Status: <strong class="govuk-tag">{{ incident.status_text|upper }}</strong></p>
+                <p class="govuk-body">Severity: <strong class="govuk-tag govuk-tag--grey">{{ incident.severity_text }}</strong></p>
+            {% else %}
+                <p class="govuk-body">Status: <strong class="govuk-tag govuk-tag--red">{{ incident.status_text|upper }}</strong></p>
+                <p class="govuk-body">Severity: <strong class="govuk-tag">{{ incident.severity_text }}</strong></p>
+            {% endif %}
+
+            {% if incident.comms_channel %}
+            <p class="govuk-body">
+                <a class="govuk-link" href="{{ incident.comms_channel.channel_id | slack_channel_link }}">
+                    #{{ incident.comms_channel.channel_name }}
+                </a>
+                on Slack
+            </p>
+            {% endif %}
+
+            {% if user_stats %}
+                <h2 class="govuk-heading-m">Participants</h2>
+                <ul class="govuk-list govuk-list--bullet">
+                    {% for user in user_stats %}
+                        <li>{{ user.user.full_name }} ({{ user.message_count }})</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            <h2 class="govuk-heading-m">Resources and Prompts</h2>
+            <p class="govuk-body">
+                <a class="govuk-link" target="_blank" href="https://opgtransform.atlassian.net/wiki/spaces/RCAS/pages/3549233153/Reporting+a+Cyber+Security+Incident+to+Information+Assurance+and+Data+Protection+Team">
+                    Should I report this to Cyber Security?<span class="govuk-visually-hidden">(opens in new tab)</span>
+                </a>
+            </p>
+        </div>
+    </div>
+
+{% endblock %}

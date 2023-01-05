@@ -1,0 +1,120 @@
+name: Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'terraform/*'
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'terraform/*'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: 'Build & Push Containers'
+    runs-on: ubuntu-latest
+    outputs:
+      build_tag: ${{ steps.create_tag.outputs.new_tag }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+          role-to-assume: arn:aws:iam::311462405659:role/incident-response-ci
+          role-duration-seconds: 3600
+          role-session-name: GitHubActions
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: 311462405659
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_HEAD_REF#refs/heads/})"
+        id: extract_branch
+
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.39.0
+        id: create_tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INITIAL_VERSION: 1.0.0
+          DEFAULT_BUMP: minor
+          PRERELEASE_SUFFIX: ${{ steps.extract_branch.outputs.branch }}
+          RELEASE_BRANCHES: main
+          WITH_V: true
+
+      - name: Build & Push
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          RESPONSE_ECR_REPOSITORY: opg-incident-response
+          NGINX_ECR_REPOSITORY: incident-response/nginx
+          IMAGE_TAG: ${{ steps.create_tag.outputs.new_tag }}
+        if: github.ref != 'refs/heads/main'
+        run: |
+          docker build -f Dockerfile.response -t $ECR_REGISTRY/$RESPONSE_ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$RESPONSE_ECR_REPOSITORY:$IMAGE_TAG
+          docker build -f Dockerfile.nginx -t $ECR_REGISTRY/$NGINX_ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$NGINX_ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Build & Push
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          RESPONSE_ECR_REPOSITORY: opg-incident-response
+          NGINX_ECR_REPOSITORY: incident-response/nginx
+          IMAGE_TAG: ${{ steps.create_tag.outputs.new_tag }}
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          docker build -f Dockerfile.response -t $ECR_REGISTRY/$RESPONSE_ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$RESPONSE_ECR_REPOSITORY:$IMAGE_TAG
+          docker build -f Dockerfile.nginx -t $ECR_REGISTRY/$NGINX_ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$NGINX_ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.create_tag.outputs.new_tag }}
+          release_name: ${{ steps.create_tag.outputs.new_tag }}
+          draft: false
+          prerelease: false
+
+  push_to_parameter_store:
+    name: Store Tag in Parameter Store
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+          role-to-assume: arn:aws:iam::997462338508:role/incident-response-ci
+          role-duration-seconds: 3600
+          role-session-name: GitHubActions
+      - name: Install AWS CLI
+        id: install-aws-cli
+        uses: unfor19/install-aws-cli-action@v1
+      - name: Push Tag to Parameter Store
+        run: |
+          aws ssm put-parameter --name "incident-response-production-tag" --type "String" --value "${{ needs.build.outputs.build_tag }}" --overwrite --region=eu-west-1
