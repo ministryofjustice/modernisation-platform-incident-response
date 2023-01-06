@@ -17,7 +17,7 @@ jobs:
       latest-tag: ${{ steps.output_tag.outputs.tag }}
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Wait for build
         uses: lewagon/wait-on-check-action@v0.2
@@ -59,7 +59,7 @@ jobs:
       TF_VAR_nginx_tag: ${{ needs.pull_tag.outputs.latest-tag }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
