@@ -10,67 +10,67 @@ defaults:
     shell: bash
 
 jobs:
-  pull_tag:
-    name: Pull latest tag from parameter store.
-    runs-on: ubuntu-latest
-    outputs:
-      latest-tag: ${{ steps.output_tag.outputs.tag }}
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Wait for build
-        uses: lewagon/wait-on-check-action@v0.2
-        with:
-          ref: main
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 20
-          running-workflow-name: 'Pull latest tag from parameter store.'
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1
-          role-to-assume: arn:aws:iam::997462338508:role/incident-response-ci
-          role-duration-seconds: 3600
-          role-session-name: GitHubActions
-      - name: Install AWS CLI
-        id: install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-      - name: Pull Tag from Parameter Store
-        run: |
-          echo  'TAG_NAME='$(aws ssm get-parameter --region "eu-west-1" --name "incident-response-production-tag" --query Parameter.Value) >> $GITHUB_ENV
-      - name: Output Tag
-        id: output_tag
-        run: echo "::set-output name=tag::${{ env.TAG_NAME }}"
-
-
-  terraform:
-    name: 'Terraform'
-    needs: pull_tag
-    runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      TF_WORKSPACE: production
-      TF_VAR_response_tag: ${{ needs.pull_tag.outputs.latest-tag }}
-      TF_VAR_nginx_tag: ${{ needs.pull_tag.outputs.latest-tag }}
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
-        with:
-          terraform_version: 1.0.0
-
-      - name: Terraform Init
-        working-directory: ./terraform
-        run: terraform init
-
-      - name: Terraform Apply
-        working-directory: ./terraform
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply --auto-approve
+#  pull_tag:
+#    name: Pull latest tag from parameter store.
+#    runs-on: ubuntu-latest
+#    outputs:
+#      latest-tag: ${{ steps.output_tag.outputs.tag }}
+#    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+#    steps:
+#      - uses: actions/checkout@v2
+#
+#      - name: Wait for build
+#        uses: lewagon/wait-on-check-action@v0.2
+#        with:
+#          ref: main
+#          repo-token: ${{ secrets.GITHUB_TOKEN }}
+#          wait-interval: 20
+#          running-workflow-name: 'Pull latest tag from parameter store.'
+#
+#      - name: Configure AWS Credentials
+#        uses: aws-actions/configure-aws-credentials@v1
+#        with:
+#          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#          aws-region: eu-west-1
+#          role-to-assume: arn:aws:iam::997462338508:role/incident-response-ci
+#          role-duration-seconds: 3600
+#          role-session-name: GitHubActions
+#      - name: Install AWS CLI
+#        id: install-aws-cli
+#        uses: unfor19/install-aws-cli-action@v1
+#      - name: Pull Tag from Parameter Store
+#        run: |
+#          echo  'TAG_NAME='$(aws ssm get-parameter --region "eu-west-1" --name "incident-response-production-tag" --query Parameter.Value) >> $GITHUB_ENV
+#      - name: Output Tag
+#        id: output_tag
+#        run: echo "::set-output name=tag::${{ env.TAG_NAME }}"
+#
+#
+#  terraform:
+#    name: 'Terraform'
+#    needs: pull_tag
+#    runs-on: ubuntu-latest
+#    env:
+#      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#      TF_WORKSPACE: production
+#      TF_VAR_response_tag: ${{ needs.pull_tag.outputs.latest-tag }}
+#      TF_VAR_nginx_tag: ${{ needs.pull_tag.outputs.latest-tag }}
+#
+#    steps:
+#      - uses: actions/checkout@v2
+#
+#      - name: Setup Terraform
+#        uses: hashicorp/setup-terraform@v1
+#        with:
+#          terraform_version: 1.0.0
+#
+#      - name: Terraform Init
+#        working-directory: ./terraform
+#        run: terraform init
+#
+#      - name: Terraform Apply
+#        working-directory: ./terraform
+#        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+#        run: terraform apply --auto-approve

@@ -1,4 +1,5 @@
-# Set ${NGROK_TOKEN} as an environment variable or pass it at the command
+# Set ${NGROK_TOKEN} as an environment variable and pass it at the command as an argument
 FROM gtriggiano/ngrok-tunnel
+ARG NGROK_TOKEN
 RUN echo "authtoken: ${NGROK_TOKEN}" >> ngrok.yml
 CMD ["npm", "start"]

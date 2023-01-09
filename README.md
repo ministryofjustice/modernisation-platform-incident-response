@@ -1,14 +1,79 @@
-# OPG Incident Response ⚡
+# Modernisation Platform Incident Response ⚡
 
-OPG Incident Response is a Django app based on [Monzo's Response tool](https://github.com/monzo/response), with some additional integrations with tools we use and a reskin to meet GOV.UK design standards.
+Modernisation Platform Incident Response is a Django app based on [Monzo's Response tool](https://github.com/monzo/response), and OPG integrations with tools they use and a reskin to meet GOV.UK design standards.
+Further changes to the app will be to make it work for the Modernisation Platform. Especially the deployment of the application, which most likely will be hosted on the Cloud Platform.
 
 ## Local Development
 
-To start the application locally, copy `env.dev.example` to `.env` and configure the environment variables inside. All environment variables need to be set, but some can be set to nonsense values (i.e. `ENV_VAR=...`) as detailed in the table below.
+Refer to the diagram in this [README](https://github.com/monzo/response/blob/master/demo/README.md) to see what components the response app is made of, when running locally.
 
-You will need to configure a Slack app following the instructions below, and can then start the application with `docker-compose up -d`.
+# Step 1 - create a slack app
 
-Note if you are using ngrok, they have now introduced auth tokens so you'll need to add one to the `ngrok.yml` in the ngrok container
+Create a slack app using this [README](https://github.com/monzo/response/blob/master/docs/slack_app_create.md).
+
+# Step 2 - configure your local environment
+
+Copy `env.dev.example` to `.env` and configure the environment variables inside. All environment variables need to be set, but some can be set to nonsense values (i.e. `ENV_VAR=...`) as detailed in the table below.
+
+# Step 3 - set ngrok token
+
+Ngrok is a tool that allows an application that is run locally to be publicly accessible, by exposing a public endpoint on your local machine.
+In your browser, navigate to [ngrok website](https://dashboard.ngrok.com/get-started/setup), register or sign in and make a note of your personal token.
+Set `NGROK_TOKEN` as an environment variable. This will be further used when building a Docker image or running the Docker compose.
+```export NGROK_TOKEN=<your_personal_ngrok_token>```
+
+# Step 4 - manually create Docker images for the response, cron, response-nginx and ngrok containers (Optional)
+
+Run the following `docker build` commands in order to create Docker images for the response, cron, response-nginx and ngrok containers:
+```
+docker build -t response:latest -f ./Dockerfile.response .
+docker build -t cron:latest -f ./Dockerfile.cron .
+docker build -t response-nginx:latest -f ./Dockerfile.nginx .
+docker build -t ngrok:latest -f ./Dockerfile.ngrok --build-arg NGROK_TOKEN .
+```
+Refer to [Docker build documentation](https://docs.docker.com/engine/reference/commandline/build/) on the build options.
+
+# Step 5 - set ECR account number (Optional)
+
+If you are planning to use images that are published on a remote ECR repository, set `ECR_ACCOUNT_NUMBER` as follow:
+```export ECR_ACCOUNT_NUMBER=<ECR_account_number>```
+where you can retrieve your `<ECR_account_number>` by following [Cloud Platform user manual](https://user-guide.cloud-platform.service.justice.gov.uk/documentation/getting-started/ecr-setup.html#accessing-the-credentials),
+e.g.
+```cloud-platform decode-secret -n incident-management-dev -s ecr-repo-incident-management-dev```
+
+# Step 6 - version incompatibility workaround (Optional)
+
+If your docker version is >= `Docker version 20.10.17, build 100c701` you may need this workaround to avoid docker compose failures in the next step:
+```
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+```
+
+# Step 7 - run docker compose
+
+Edit compose.yml following comments inside the file.
+In order to start the application run the `docker-compose up -d`.
+
+Refer to Docker compose [specification](https://docs.docker.com/compose/compose-file/) and [file build](https://docs.docker.com/compose/compose-file/build/) documentation for more options.
+
+# Step 8 - verify the local deployment
+To confirm ngrok token was configured correctly, see on the ngrok container the content of the `ngrok.yml` file and whether the `authtoken` value is populated:
+```cat ngrok.yml```
+
+In your browser, navigate to:
+http://localhost/
+http://localhost:4040/inspect/http
+
+Make a note of the ngrok URL, it will look something like:
+`https://<IP>.ngrok.io`
+
+# Step 9 - configure the slack app
+
+In your browser, navigate to https://api.slack.com/apps  and configure slack app setup using this [README](https://github.com/monzo/response/blob/master/docs/slack_app_config.md).
+
+# Step 10 - test the app
+
+In your slack channel, try `/incident test` and see if it works.
 
 ## Versions and Releases
 
