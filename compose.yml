@@ -1,0 +1,98 @@
+# Docker compose allows to run Docker containers locally.
+# There are many ways to configure a source image for a container in a Docker compose file.
+# The below, considers three options:
+# OPTION 1: Building Docker images on the fly
+# `build` block must be uncommented and `image` should be commented out
+# e.g.
+# build:
+#   context: .
+#   dockerfile: Dockerfile.response
+# OPTION 2: Using locally built Docker images
+# `build` block must be commented out and `image` should point to a local image name/tag
+# e.g.
+# image: response
+# OPTION 3: Using images from a remote repository
+# `build block must be commented out and `image` should point to a remote image name/tag
+# e.g.
+# image: ${ECR_ACCOUNT_NUMBER}.dkr.ecr.eu-west-2.amazonaws.com/modernisation-platform/incident-management-dev-ecr:response_latest
+# NOTE: $ECR_ACCOUNT_NUMBER must be set prior running this docker compose config using remote source
+version: "3"
+services:
+  response:
+    build:
+      context: .
+      dockerfile: Dockerfile.response
+    #    image: response
+    #    image: ${ECR_ACCOUNT_NUMBER}.dkr.ecr.eu-west-2.amazonaws.com/modernisation-platform/incident-management-dev-ecr:response_latest
+    container_name: response
+    entrypoint: bash
+    command: /app/startup.sh --watch
+    expose:
+      - 8000
+    depends_on:
+      - db
+    env_file: .env
+    volumes:
+      - ./:/app
+      - ../:/response
+      - pypd:/app/pypd
+    stdin_open: true
+    tty: true
+    restart: always
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    #    image: response-nginx
+    #    image: ${ECR_ACCOUNT_NUMBER}.dkr.ecr.eu-west-2.amazonaws.com/modernisation-platform/incident-management-dev-ecr:response-nginx_latest
+    container_name: response-nginx
+    environment:
+      APP_HOST: response
+      APP_PORT: 8000
+    volumes:
+      - ./nginx/webpack/dist:/app/opgincidentresponse/static
+    ports:
+      - 80:80
+    depends_on:
+      - response
+
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
+    #    image: cron
+    #    image: ${ECR_ACCOUNT_NUMBER}.dkr.ecr.eu-west-2.amazonaws.com/modernisation-platform/incident-management-dev-ecr:cron_latest
+    container_name: cron
+    depends_on:
+      - response
+    tty: true
+
+  db:
+    image: "postgres:11.2"
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  ngrok:
+    build:
+      context: .
+      args:
+        NGROK_TOKEN: ${NGROK_TOKEN}
+      dockerfile: Dockerfile.ngrok
+    #    image: ngrok
+    #    image: ${ECR_ACCOUNT_NUMBER}.dkr.ecr.eu-west-2.amazonaws.com/modernisation-platform/incident-management-dev-ecr:ngrok_latest
+    container_name: ngrok
+    environment:
+      TARGET_HOST: "response"
+      TARGET_PORT: 8000
+    ports:
+      - "4040:4040"
+    depends_on:
+      - response
+
+volumes:
+  postgres_data:
+  pypd:

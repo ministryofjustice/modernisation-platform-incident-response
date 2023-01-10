@@ -13,4 +13,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: ministryofjustice/opg-repository-scanner@latest
+      - uses: ministryofjustice/modernisation-platform-incident-response@latest
